@@ -1,0 +1,117 @@
+name: Build Mobile App
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_id:
+        description: 'Build record ID from ERP'
+        required: true
+        type: string
+      erp_url:
+        description: 'ERP base URL (e.g. https://fixedplus.com.bd)'
+        required: true
+        type: string
+      app:
+        description: 'App to build'
+        required: true
+        default: 'storefront'
+        type: choice
+        options:
+          - storefront
+          - admin
+          - pos
+          - all
+      platform:
+        description: 'Target platform'
+        required: true
+        default: 'android'
+        type: choice
+        options:
+          - android
+          - ios
+          - both
+
+  repository_dispatch:
+    types: [mobile-build]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: ${{ fromJSON(
+          inputs.app == 'all' && '["storefront","admin","pos"]' ||
+          format('["{0}"]', inputs.app ||
+            fromJSON(format('["{0}"]', github.event.client_payload.app || 'storefront'))
+          )
+        ) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve build metadata
+        id: meta
+        env:
+          BUILD_ID: ${{ inputs.build_id || github.event.client_payload.buildId || '' }}
+          ERP_URL: ${{ inputs.erp_url || github.event.client_payload.erpUrl || '' }}
+          CALLBACK_TOKEN: ${{ github.event.client_payload.callbackToken || secrets.MOBILE_BUILDER_CALLBACK_TOKEN || '' }}
+        run: |
+          if [ -z "$BUILD_ID" ] || [ -z "$ERP_URL" ]; then
+            echo "ERROR: build_id and erp_url are required"
+            exit 1
+          fi
+          META_URL="${ERP_URL}/api/mobile-builder/metadata/${BUILD_ID}"
+          bash scripts/fetch-metadata.sh "$META_URL"
+          echo "callback_url=${ERP_URL}/api/mobile-builder/artifact" >> $GITHUB_OUTPUT
+          echo "callback_token=${CALLBACK_TOKEN}" >> $GITHUB_OUTPUT
+          echo "build_id=${BUILD_ID}" >> $GITHUB_OUTPUT
+
+      - name: Configure app
+        run: bash scripts/configure-app.sh "${{ matrix.app }}" metadata.json
+
+      - name: Build Android APK
+        if: ${{ inputs.platform == 'android' || inputs.platform == 'both' || github.event.client_payload.platform == 'android' || github.event.client_payload.platform == null }}
+        run: bash scripts/build-android.sh "${{ matrix.app }}" release
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+
+      - name: Upload Artifact (multipart)
+        env:
+          BUILD_ID: ${{ steps.meta.outputs.build_id }}
+          CALLBACK_URL: ${{ steps.meta.outputs.callback_url }}
+          CALLBACK_TOKEN: ${{ steps.meta.outputs.callback_token }}
+        run: |
+          APK_PATH="mobile-builds/${{ matrix.app }}/android/latest.apk"
+          if [ -f "$APK_PATH" ] && [ -n "$CALLBACK_URL" ]; then
+            bash scripts/upload-artifact.sh "$BUILD_ID" "$APK_PATH" "android" "${{ matrix.app }}" "$CALLBACK_URL" "$CALLBACK_TOKEN"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-android-apk
+          path: mobile-builds/${{ matrix.app }}/android/latest.apk
+          if-no-files-found: warn
+
+      - name: Notify failure
+        if: failure()
+        env:
+          BUILD_ID: ${{ steps.meta.outputs.build_id }}
+          CALLBACK_URL: ${{ steps.meta.outputs.callback_url }}
+          CALLBACK_TOKEN: ${{ steps.meta.outputs.callback_token }}
+        run: |
+          if [ -n "$CALLBACK_URL" ]; then
+            curl -sS -X POST "$CALLBACK_URL" \
+              -F "buildId=$BUILD_ID" \
+              -F "status=failed" \
+              -F "errorMessage=Build workflow failed" \
+              -F "callbackToken=$CALLBACK_TOKEN"
+          fi

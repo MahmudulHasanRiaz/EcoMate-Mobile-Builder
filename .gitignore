@@ -1,0 +1,13 @@
+node_modules/
+dist/
+android/
+ios/
+mobile-builds/
+metadata.json
+*.apk
+*.aab
+*.ipa
+.env
+signing/*.keystore
+signing/*.jks
+.DS_Store

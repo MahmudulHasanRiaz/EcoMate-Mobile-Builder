@@ -1,0 +1,20 @@
+{
+  "name": "ecomate-mobile-builder",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "build:storefront": "bash scripts/build-android.sh storefront",
+    "build:admin": "bash scripts/build-android.sh admin",
+    "build:pos": "bash scripts/build-android.sh pos",
+    "build:all": "bash scripts/build-android.sh all",
+    "configure": "bash scripts/configure-app.sh"
+  },
+  "dependencies": {
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/splash-screen": "^7.0.0",
+    "@capacitor/status-bar": "^7.0.0"
+  }
+}
