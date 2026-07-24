@@ -34,18 +34,32 @@ on:
   repository_dispatch:
     types: [mobile-build]
 
+env:
+  BUILD_ID: ${{ github.event.client_payload.buildId || inputs.build_id || '' }}
+  ERP_URL: ${{ github.event.client_payload.erpUrl || inputs.erp_url || '' }}
+  CALLBACK_TOKEN: ${{ github.event.client_payload.callbackToken || secrets.MOBILE_BUILDER_CALLBACK_TOKEN || '' }}
+  APP_INPUT: ${{ github.event.client_payload.app || inputs.app || 'storefront' }}
+  PLATFORM: ${{ github.event.client_payload.platform || inputs.platform || 'android' }}
+
 jobs:
+  resolve-apps:
+    runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.set-apps.outputs.apps }}
+    steps:
+      - id: set-apps
+        run: |
+          case "${{ env.APP_INPUT }}" in
+            all)    echo 'apps=["storefront","admin","pos"]' >> $GITHUB_OUTPUT ;;
+            *)      echo 'apps=["${{ env.APP_INPUT }}"]' >> $GITHUB_OUTPUT ;;
+          esac
+
   build:
+    needs: resolve-apps
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        app: ${{ fromJSON(
-          github.event_name == 'repository_dispatch' &&
-          (github.event.client_payload.app == 'all' && '["storefront","admin","pos"]' ||
-           format('["{0}"]', github.event.client_payload.app || 'storefront'))
-          || inputs.app == 'all' && '["storefront","admin","pos"]' ||
-          format('["{0}"]', inputs.app || 'storefront')
-        ) }}
+        app: ${{ fromJSON(needs.resolve-apps.outputs.apps) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -59,12 +73,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Resolve build metadata
-        id: meta
-        env:
-          BUILD_ID: ${{ inputs.build_id || github.event.client_payload.buildId || '' }}
-          ERP_URL: ${{ inputs.erp_url || github.event.client_payload.erpUrl || '' }}
-          CALLBACK_TOKEN: ${{ github.event.client_payload.callbackToken || secrets.MOBILE_BUILDER_CALLBACK_TOKEN || '' }}
+      - name: Fetch metadata
         run: |
           if [ -z "$BUILD_ID" ] || [ -z "$ERP_URL" ]; then
             echo "ERROR: build_id and erp_url are required"
@@ -72,28 +81,24 @@ jobs:
           fi
           META_URL="${ERP_URL}/api/mobile-builder/metadata/${BUILD_ID}"
           bash scripts/fetch-metadata.sh "$META_URL"
-          echo "callback_url=${ERP_URL}/api/mobile-builder/artifact" >> $GITHUB_OUTPUT
-          echo "callback_token=${CALLBACK_TOKEN}" >> $GITHUB_OUTPUT
-          echo "build_id=${BUILD_ID}" >> $GITHUB_OUTPUT
+          echo "callback_url=${ERP_URL}/api/mobile-builder/artifact" >> $GITHUB_ENV
+          echo "callback_token=${CALLBACK_TOKEN}" >> $GITHUB_ENV
+          echo "build_id=${BUILD_ID}" >> $GITHUB_ENV
 
       - name: Configure app
         run: bash scripts/configure-app.sh "${{ matrix.app }}" metadata.json
 
       - name: Build Android APK
-        if: ${{ inputs.platform == 'android' || inputs.platform == 'both' || github.event.client_payload.platform == 'android' || github.event.client_payload.platform == null }}
+        if: ${{ env.PLATFORM == 'android' || env.PLATFORM == 'both' }}
         run: bash scripts/build-android.sh "${{ matrix.app }}" release
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
 
-      - name: Upload Artifact (multipart)
-        env:
-          BUILD_ID: ${{ steps.meta.outputs.build_id }}
-          CALLBACK_URL: ${{ steps.meta.outputs.callback_url }}
-          CALLBACK_TOKEN: ${{ steps.meta.outputs.callback_token }}
+      - name: Upload Artifact
         run: |
           APK_PATH="mobile-builds/${{ matrix.app }}/android/latest.apk"
-          if [ -f "$APK_PATH" ] && [ -n "$CALLBACK_URL" ]; then
-            bash scripts/upload-artifact.sh "$BUILD_ID" "$APK_PATH" "android" "${{ matrix.app }}" "$CALLBACK_URL" "$CALLBACK_TOKEN"
+          if [ -f "$APK_PATH" ] && [ -n "${{ env.BUILD_ID }}" ] && [ -n "${{ env.ERP_URL }}" ]; then
+            bash scripts/upload-artifact.sh "${{ env.BUILD_ID }}" "$APK_PATH" "android" "${{ matrix.app }}" "${{ env.ERP_URL }}/api/mobile-builder/artifact" "${{ env.CALLBACK_TOKEN }}"
           fi
 
       - uses: actions/upload-artifact@v4
@@ -104,15 +109,11 @@ jobs:
 
       - name: Notify failure
         if: failure()
-        env:
-          BUILD_ID: ${{ steps.meta.outputs.build_id }}
-          CALLBACK_URL: ${{ steps.meta.outputs.callback_url }}
-          CALLBACK_TOKEN: ${{ steps.meta.outputs.callback_token }}
         run: |
-          if [ -n "$CALLBACK_URL" ]; then
-            curl -sS -X POST "$CALLBACK_URL" \
-              -F "buildId=$BUILD_ID" \
+          if [ -n "${{ env.BUILD_ID }}" ] && [ -n "${{ env.ERP_URL }}" ]; then
+            curl -sS -X POST "${{ env.ERP_URL }}/api/mobile-builder/artifact" \
+              -F "buildId=${{ env.BUILD_ID }}" \
               -F "status=failed" \
               -F "errorMessage=Build workflow failed" \
-              -F "callbackToken=$CALLBACK_TOKEN"
+              -F "callbackToken=${{ env.CALLBACK_TOKEN }}"
           fi
