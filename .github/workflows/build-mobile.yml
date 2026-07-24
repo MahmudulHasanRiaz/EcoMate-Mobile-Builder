@@ -40,10 +40,11 @@ jobs:
     strategy:
       matrix:
         app: ${{ fromJSON(
+          github.event_name == 'repository_dispatch' &&
+          (github.event.client_payload.app == 'all' && '["storefront","admin","pos"]' ||
+           format('["{0}"]', github.event.client_payload.app)) ||
           inputs.app == 'all' && '["storefront","admin","pos"]' ||
-          format('["{0}"]', inputs.app ||
-            fromJSON(format('["{0}"]', github.event.client_payload.app || 'storefront'))
-          )
+          format('["{0}"]', inputs.app)
         ) }}
     steps:
       - uses: actions/checkout@v4
