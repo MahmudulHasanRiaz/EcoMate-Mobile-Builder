@@ -42,9 +42,9 @@ jobs:
         app: ${{ fromJSON(
           github.event_name == 'repository_dispatch' &&
           (github.event.client_payload.app == 'all' && '["storefront","admin","pos"]' ||
-           format('["{0}"]', github.event.client_payload.app)) ||
-          inputs.app == 'all' && '["storefront","admin","pos"]' ||
-          format('["{0}"]', inputs.app)
+           format('["{0}"]', github.event.client_payload.app || 'storefront'))
+          || inputs.app == 'all' && '["storefront","admin","pos"]' ||
+          format('["{0}"]', inputs.app || 'storefront')
         ) }}
     steps:
       - uses: actions/checkout@v4
