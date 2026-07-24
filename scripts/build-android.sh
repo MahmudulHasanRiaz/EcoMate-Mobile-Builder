@@ -48,7 +48,9 @@ cd ..
 
 if [ -f "$APK_SRC" ]; then
   mkdir -p ../../mobile-builds/$APP/android
-  cp "$APK_SRC" "../../mobile-builds/$APP/android/latest.apk"
+  # Sign the APK before copying to output
+  echo "[build] Signing APK..."
+  bash ../../scripts/sign-android.sh "$APK_SRC" "../../mobile-builds/$APP/android/latest.apk"
   echo "[build] APK ready: mobile-builds/$APP/android/latest.apk"
 else
   echo "[build] ERROR: APK not produced"

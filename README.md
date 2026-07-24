@@ -43,7 +43,33 @@ Admin clicks "Publish" in ERP admin panel → ERP calls GitHub API →
 `repository_dispatch` with type `mobile-build` → workflow starts.
 
 ## Required Secrets
-- `MOBILE_BUILDER_CALLBACK_TOKEN`: Shared secret for artifact upload
+
+| Secret | Required | Purpose |
+|--------|----------|---------|
+| `MOBILE_BUILDER_CALLBACK_TOKEN` | ✅ Yes | Shared secret for artifact upload callback to ERP |
+| `ANDROID_KEYSTORE_BASE64` | ⚠️ For release | Base64-encoded `.jks` keystore file |
+| `ANDROID_KEYSTORE_PASSWORD` | ⚠️ For release | Keystore password |
+| `ANDROID_KEY_ALIAS` | ⚠️ For release | Key alias inside the keystore |
+| `ANDROID_KEY_PASSWORD` | ⚠️ For release | Key password (defaults to keystore password if unset) |
+
+Without signing secrets, the APK is built as **debug-signed** (cannot publish to Play Store).
+
+## Signing Setup
+
+1. Generate a keystore (one per client or shared):
+   ```bash
+   keytool -genkey -v -keystore client-release.keystore \
+     -alias client-key -keyalg RSA -keysize 2048 -validity 10000
+   ```
+2. Base64 encode it:
+   ```bash
+   base64 -i client-release.keystore -o client-release.b64
+   ```
+3. Add as GitHub Secrets:
+   - `ANDROID_KEYSTORE_BASE64` — content of the `.b64` file
+   - `ANDROID_KEYSTORE_PASSWORD` — the store password
+   - `ANDROID_KEY_ALIAS` — the alias name
+4. The `sign-android.sh` script runs automatically after each build
 
 ## No Business Logic
 This repo contains no ERP code, no Prisma, no NestJS.
