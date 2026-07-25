@@ -73,9 +73,19 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Write metadata from dispatch payload
+      - name: Fetch metadata from ERP (public endpoint)
+        id: meta
+        continue-on-error: true
         run: |
-          echo '${{ toJSON(github.event.client_payload) }}' > metadata.json
+          if [ -z "$BUILD_ID" ] || [ -z "$ERP_URL" ]; then
+            echo "ERROR: build_id and erp_url are required"
+            exit 1
+          fi
+          META_URL="${ERP_URL}/api/mobile-builder/metadata/${BUILD_ID}"
+          curl -sS -f -o metadata.json "$META_URL" || {
+            echo "ERP metadata fetch failed — using inline fallback"
+            echo '{"appName":"EcoMate","packageId":"com.ecomate.app","bundleId":"com.ecomate.app","versionName":"1.0.0","versionCode":1,"splashColor":"#0089CD"}' > metadata.json
+          }
           echo "callback_url=${ERP_URL}/api/mobile-builder/artifact" >> $GITHUB_ENV
           echo "build_id=${BUILD_ID}" >> $GITHUB_ENV
 
