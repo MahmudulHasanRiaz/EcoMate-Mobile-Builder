@@ -23,13 +23,13 @@ npm install --no-save @capacitor/android 2>/dev/null || true
 # Add Android platform if not present
 if [ ! -f "android/build.gradle" ]; then
   echo "[build] Adding Android platform..."
-  npx cap add android --no-telemetry 2>&1
+  npx cap add android 2>&1
 fi
 
 # Sync
 mkdir -p dist android/app/src/main/assets
 echo "[build] Syncing Capacitor config..."
-npx cap sync android --no-telemetry 2>&1
+npx cap sync android 2>&1
 
 # Build
 echo "[build] Running Gradle (assemble${BUILD_TYPE^})..."
