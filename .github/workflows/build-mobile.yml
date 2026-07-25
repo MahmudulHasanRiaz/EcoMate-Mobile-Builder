@@ -104,11 +104,25 @@ jobs:
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
 
-      - name: Upload Artifact
+      - name: Notify backend (artifact stored in GitHub Actions)
+        if: ${{ env.PLATFORM == 'android' || env.PLATFORM == 'both' }}
         run: |
           APK_PATH="mobile-builds/${{ matrix.app }}/android/latest.apk"
-          if [ -f "$APK_PATH" ] && [ -n "${{ env.BUILD_ID }}" ] && [ -n "${{ env.ERP_URL }}" ]; then
-            bash scripts/upload-artifact.sh "${{ env.BUILD_ID }}" "$APK_PATH" "android" "${{ matrix.app }}" "${{ env.ERP_URL }}/api/mobile-builder/artifact" "${{ env.CALLBACK_TOKEN }}"
+          if [ -f "$APK_PATH" ] && [ -n "${{ env.BUILD_ID }}" ]; then
+            PAYLOAD=$(cat <<EOF
+          {
+            "buildId": "${{ env.BUILD_ID }}",
+            "app": "${{ matrix.app }}",
+            "platform": "android",
+            "status": "completed",
+            "runId": "${{ github.run_id }}",
+            "callbackToken": "${{ env.CALLBACK_TOKEN }}"
+          }
+          EOF
+          )
+            curl -sS -X POST "${{ env.ERP_URL }}/api/mobile-builder/artifact/pull" \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD" || echo "[notify] Backend notification failed (APK saved in GitHub artifact)"
           fi
 
       - uses: actions/upload-artifact@v4
