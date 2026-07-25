@@ -30,18 +30,15 @@ npx cap sync android 2>&1
 
 # Build
 echo "[build] Running Gradle (assemble${BUILD_TYPE^})..."
-cd android
 
 if [ "$BUILD_TYPE" = "release" ]; then
-  ./gradlew assembleRelease --no-daemon 2>&1
-  APK_SRC="app/build/outputs/apk/release/app-release.apk"
-  AAB_SRC="app/build/outputs/bundle/release/app-release.aab"
+  ./android/gradlew -p android assembleRelease --no-daemon 2>&1
+  APK_SRC="android/app/build/outputs/apk/release/app-release.apk"
+  AAB_SRC="android/app/build/outputs/bundle/release/app-release.aab"
 else
-  ./gradlew assembleDebug --no-daemon 2>&1
-  APK_SRC="app/build/outputs/apk/debug/app-debug.apk"
+  ./android/gradlew -p android assembleDebug --no-daemon 2>&1
+  APK_SRC="android/app/build/outputs/apk/debug/app-debug.apk"
 fi
-
-cd ..
 
 if [ -f "$APK_SRC" ]; then
   mkdir -p ../../mobile-builds/$APP/android
@@ -50,7 +47,8 @@ if [ -f "$APK_SRC" ]; then
   bash ../../scripts/sign-android.sh "$APK_SRC" "../../mobile-builds/$APP/android/latest.apk"
   echo "[build] APK ready: mobile-builds/$APP/android/latest.apk"
 else
-  echo "[build] ERROR: APK not produced"
+  echo "[build] ERROR: APK not produced at $APK_SRC"
+  ls android/app/build/outputs/apk/release/ 2>/dev/null || echo "(no release apk dir)"
   exit 1
 fi
 
