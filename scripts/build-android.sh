@@ -33,7 +33,7 @@ echo "[build] Running Gradle (assemble${BUILD_TYPE^})..."
 
 if [ "$BUILD_TYPE" = "release" ]; then
   ./android/gradlew -p android assembleRelease --no-daemon 2>&1
-  APK_SRC="android/app/build/outputs/apk/release/app-release.apk"
+  APK_SRC="android/app/build/outputs/apk/release/app-release-unsigned.apk"
   AAB_SRC="android/app/build/outputs/bundle/release/app-release.aab"
 else
   ./android/gradlew -p android assembleDebug --no-daemon 2>&1
