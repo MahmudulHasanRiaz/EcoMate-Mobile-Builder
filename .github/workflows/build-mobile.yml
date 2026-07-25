@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       erp_url:
-        description: 'ERP base URL (e.g. https://fixedplus.com.bd)'
+        description: 'ERP base URL (e.g. https://api.fixedplus.com.bd)'
         required: true
         type: string
       app:
@@ -73,16 +73,10 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Fetch metadata
+      - name: Write metadata from dispatch payload
         run: |
-          if [ -z "$BUILD_ID" ] || [ -z "$ERP_URL" ]; then
-            echo "ERROR: build_id and erp_url are required"
-            exit 1
-          fi
-          META_URL="${ERP_URL}/api/mobile-builder/metadata/${BUILD_ID}"
-          bash scripts/fetch-metadata.sh "$META_URL"
+          echo '${{ toJSON(github.event.client_payload) }}' > metadata.json
           echo "callback_url=${ERP_URL}/api/mobile-builder/artifact" >> $GITHUB_ENV
-          echo "callback_token=${CALLBACK_TOKEN}" >> $GITHUB_ENV
           echo "build_id=${BUILD_ID}" >> $GITHUB_ENV
 
       - name: Configure app
