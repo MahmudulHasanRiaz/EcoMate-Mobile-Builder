@@ -17,13 +17,10 @@ echo "[build] Building $APP ($BUILD_TYPE)..."
 
 cd "$APP_DIR"
 
-# Install dependencies
-npm install --no-save @capacitor/android 2>/dev/null || true
-
 # Add Android platform if not present
 if [ ! -f "android/build.gradle" ]; then
   echo "[build] Adding Android platform..."
-  npx cap add android 2>&1
+  npx cap add android 2>&1 || { echo "[build] cap add android failed"; exit 1; }
 fi
 
 # Sync

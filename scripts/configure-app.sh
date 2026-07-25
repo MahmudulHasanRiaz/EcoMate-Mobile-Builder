@@ -26,39 +26,38 @@ LOGO_URL=$(jq -r '.logo // ""' "$META")
 echo "[configure] Configuring $APP for $APP_NAME ($CLIENT_DOMAIN)"
 echo "[configure] Package ID: $PACKAGE_ID"
 
-# Generate capacitor.config.js (no TypeScript needed)
-cat > "$APP_DIR/capacitor.config.js" <<CONF
-/** @type {import('@capacitor/cli').CapacitorConfig} */
-const config = {
-  appId: '${PACKAGE_ID}',
-  appName: '${APP_NAME}',
-  webDir: 'dist',
-  bundledWebRuntime: false,
-  server: {
-    url: 'https://${CLIENT_DOMAIN}',
-    cleartext: true,
-    hostname: '${CLIENT_DOMAIN}',
+# Generate capacitor.config.json (most portable format)
+cat > "$APP_DIR/capacitor.config.json" <<CONF
+{
+  "appId": "${PACKAGE_ID}",
+  "appName": "${APP_NAME}",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://${CLIENT_DOMAIN}",
+    "cleartext": true,
+    "hostname": "${CLIENT_DOMAIN}"
   },
-  android: {
-    allowMixedContent: true,
+  "android": {
+    "allowMixedContent": true
   },
-  ios: {
-    contentInset: 'always',
+  "ios": {
+    "contentInset": "always"
   },
-  plugins: {
-    SplashScreen: {
-      launchShowDuration: 2000,
-      backgroundColor: '${PRIMARY_COLOR}',
-    },
-  },
-};
-export default config;
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "${PRIMARY_COLOR}"
+    }
+  }
+}
 CONF
 
-# Delete old TypeScript config if present
-rm -f "$APP_DIR/capacitor.config.ts"
+# Remove any leftover .ts or .js config files
+rm -f "$APP_DIR/capacitor.config.ts" "$APP_DIR/capacitor.config.js"
 
-echo "[configure] capacitor.config.js written"
+echo "[configure] capacitor.config.json written:"
+echo "  appId=${PACKAGE_ID} appName=${APP_NAME} server=https://${CLIENT_DOMAIN}"
 
 # Download icon if URL provided
 if [ -n "$FAVICON_URL" ] && [ "$FAVICON_URL" != "null" ]; then
