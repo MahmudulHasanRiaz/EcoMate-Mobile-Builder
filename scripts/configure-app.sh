@@ -26,11 +26,10 @@ LOGO_URL=$(jq -r '.logo // ""' "$META")
 echo "[configure] Configuring $APP for $APP_NAME ($CLIENT_DOMAIN)"
 echo "[configure] Package ID: $PACKAGE_ID"
 
-# Generate capacitor.config.ts
-cat > "$APP_DIR/capacitor.config.ts" <<CONF
-import type { CapacitorConfig } from '@capacitor/cli';
-
-const config: CapacitorConfig = {
+# Generate capacitor.config.js (no TypeScript needed)
+cat > "$APP_DIR/capacitor.config.js" <<CONF
+/** @type {import('@capacitor/cli').CapacitorConfig} */
+const config = {
   appId: '${PACKAGE_ID}',
   appName: '${APP_NAME}',
   webDir: 'dist',
@@ -53,11 +52,13 @@ const config: CapacitorConfig = {
     },
   },
 };
-
 export default config;
 CONF
 
-echo "[configure] capacitor.config.ts written"
+# Delete old TypeScript config if present
+rm -f "$APP_DIR/capacitor.config.ts"
+
+echo "[configure] capacitor.config.js written"
 
 # Download icon if URL provided
 if [ -n "$FAVICON_URL" ] && [ "$FAVICON_URL" != "null" ]; then
